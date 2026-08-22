@@ -51,6 +51,16 @@ const Login = () => {
 
     return (
         <div className='fixed inset-0 z-50 backdrop-blur-md bg-black/40 flex justify-center items-center p-4' onClick={() => setShowLogin(false)}>
+            <style>{`
+                input[type="password"]::-ms-reveal,
+                input[type="password"]::-ms-clear,
+                input[type="password"]::-webkit-contacts-auto-fill-button,
+                input[type="password"]::-webkit-credentials-auto-fill-button {
+                    display: none !important;
+                    visibility: hidden;
+                    pointer-events: none;
+                }
+            `}</style>
 
             <motion.div
                 onClick={(e) => e.stopPropagation()}
@@ -151,9 +161,11 @@ const Login = () => {
                             onChange={e => setPassword(e.target.value)}
                             value={password}
                             type={showPassword ? "text" : "password"}
-                            className='w-full bg-transparent outline-none text-sm text-gray-800 placeholder-gray-400'
+                            className='w-full bg-transparent outline-none text-sm text-gray-800 placeholder-gray-400 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden'
                             placeholder='Password'
+                            autoComplete="new-password"
                             required
+                            style={{ WebkitTextSecurity: showPassword ? 'none' : undefined }}
                         />
                         <button
                             type="button"

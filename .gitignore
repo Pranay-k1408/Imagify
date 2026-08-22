@@ -37,3 +37,7 @@ pnpm-debug.log*
 
 # OS files
 Thumbs.db
+
+# Vite timestamp temporary files
+*.timestamp-*.mjs
+**/*.timestamp-*.mjs

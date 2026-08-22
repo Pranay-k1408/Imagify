@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import razorpay from 'razorpay'
 import transactionModel from "../models/transactionModel.js";
+import crypto from 'crypto'
 
 const registerUser = async (req, res)=>{
     try{
@@ -146,31 +147,40 @@ const paymentRazorpay = async (req, res)=>{
 
 const verifyRazorpay = async (req, res) => {
     try {
-        const{razorpay_order_id} = req.body;
-        const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id)
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-        if (orderInfo.status === 'paid') {
-            const transactionData = await transactionModel.findById(orderInfo.receipt)
+        // Step 1: Verify HMAC-SHA256 signature to ensure payment is genuinely from Razorpay
+        const expectedSignature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+            .digest('hex');
 
-            if (transactionData.payment) {
-                return res.json({ success:false, message:'Payment Failed' })
-            }
-
-            const userData = await userModel.findById(transactionData.userId)
-
-            const creditBalance = userData.creditBalance + transactionData.credits
-            await userModel.findByIdAndUpdate(userData._id, {creditBalance})
-
-            await transactionModel.findByIdAndUpdate(transactionData._id, {payment: true})
-
-            res.json({ success: true, message: "Credits Added"})
-        }else{
-            res.json({ success: false, message: "Payment Failed"})
+        if (expectedSignature !== razorpay_signature) {
+            return res.json({ success: false, message: 'Payment verification failed: invalid signature' });
         }
+
+        // Step 2: Fetch order to get the receipt (transaction ID) and credit the user
+        const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id);
+        const transactionData = await transactionModel.findById(orderInfo.receipt);
+
+        if (!transactionData) {
+            return res.json({ success: false, message: 'Transaction not found' });
+        }
+
+        if (transactionData.payment) {
+            return res.json({ success: false, message: 'Credits already added for this payment' });
+        }
+
+        const userData = await userModel.findById(transactionData.userId);
+        const creditBalance = (userData.creditBalance || 0) + transactionData.credits;
+        await userModel.findByIdAndUpdate(userData._id, { creditBalance });
+        await transactionModel.findByIdAndUpdate(transactionData._id, { payment: true });
+
+        res.json({ success: true, message: 'Credits Added' });
 
     } catch (error) {
         console.log(error);
-        res.json({success:false, message: error.message})
+        res.json({ success: false, message: error.message });
     }
 }
 
